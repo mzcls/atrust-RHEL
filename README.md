@@ -80,7 +80,7 @@ https://atrustcdn.sangfor.com/standard/linux/2.5.16.30/ubuntu/amd64/aTrustInstal
 ├── rpm-packaging/
 │   ├── SPECS/cn.com.sangfor.atrust.spec
 │   └── helpers/                      # 适配后的安装/卸载脚本
-└── README-rpm.md
+└── README.md
 ```
 
 
@@ -126,6 +126,12 @@ https://atrustcdn.sangfor.com/standard/linux/2.5.16.30/ubuntu/amd64/aTrustInstal
 10. **桌面项**：保留官方 deb 的最终行为（`/usr/share/applications/...` 指向
     `/opt/apps/...`）。对没有内嵌主题名的通用安装包，官方脚本会保留原桌面文件，
     此处行为一致。
+11. **接入地址无法记住（重要）**：客户端自带的 `libmmkv.so` 带有**可执行栈**
+    (`PT_GNU_STACK=RWE`) 标记，新版 Fedora 内核/glibc 会拒绝加载
+    （`cannot enable executable stack as shared object requires: Invalid argument`），
+    导致历史/地址数据库（libmmkv）加载失败，表现为“接入地址重启后为空”。
+    构建时用 `patchelf --clear-execstack` 去掉该标记即可（mmkv 并不需要可执行栈）。
+    涉及 `BuildRequires: patchelf`，CI 与本地构建都会自动安装。
 
 ## 已验证
 
@@ -135,6 +141,8 @@ https://atrustcdn.sangfor.com/standard/linux/2.5.16.30/ubuntu/amd64/aTrustInstal
 - `/etc/hosts` 写入 `127.0.0.1 localhost.sangfor.com.cn`，证书已进系统信任库。
 - 包内所有 ELF 依赖均可解析（`ldd` 无 missing）。
 - Electron 托盘在虚拟显示（Xvfb）下可正常启动运行，界面中英文/数字均能正常显示（无方框）。
+- `libmmkv.so` 可被 dlopen 加载；`visitHistory -q` 能返回已保存的接入地址
+  （如 `https://vpn.966599.com`），接入地址可持久化。
 
 ## 已知限制
 

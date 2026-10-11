@@ -28,6 +28,8 @@ Source0:        atrust-data.tar.xz
 Source1:        atrust-rpm-helpers.tar.gz
 %{!?atrust_arch:%global atrust_arch x86_64}
 BuildArch:      %{atrust_arch}
+# 用于清除 libmmkv.so 的可执行栈需求（见 %install 说明）
+BuildRequires:  patchelf
 
 # Runtime tools used by the client and by its maintainer scripts.
 Requires:       bash
@@ -174,6 +176,27 @@ sed -i 's#^Exec=/usr/share/sangfor/aTrust/aTrustTray#Exec=env FONTCONFIG_FILE=/e
     %{buildroot}/usr/share/applications/cn.com.sangfor.atrust.desktop
 sed -i '/^export PATH$/a export FONTCONFIG_FILE=/etc/fonts/atrust-fonts.conf' \
     %{buildroot}/usr/share/sangfor/aTrust/resources/shell/aTrustTrayStart.sh
+
+# 清理“可执行栈(execstack)”需求。
+# 客户端自带的 libmmkv.so 带有 PT_GNU_STACK=RWE 标记，新版内核/glibc 会拒绝加载
+# （报错：cannot enable executable stack as shared object requires: Invalid argument），
+# 导致历史/地址数据库(libmmkv)无法加载，表现为“接入地址无法记住/重启后为空”。
+# mmkv 并不真的需要可执行栈，这里统一去掉该标记。
+command -v patchelf >/dev/null 2>&1 || { echo "ERROR: 需要 patchelf 来清除 libmmkv.so 的 execstack 标记" >&2; exit 1; }
+for d in \
+    usr/share/sangfor/aTrust/resources/bin \
+    usr/share/sangfor/aTrust/resources/lib \
+    usr/share/sangfor/aTrust/uem/bin \
+    usr/share/sangfor/aTrust/uem/lib ; do
+  [ -d "%{buildroot}/$d" ] || continue
+  for f in "%{buildroot}/$d"/*; do
+    [ -f "$f" ] || continue
+    if LC_ALL=C readelf -lW "$f" 2>/dev/null | grep -q 'GNU_STACK.*RWE'; then
+      echo "clear execstack: ${f#%{buildroot}}"
+      patchelf --clear-execstack "$f"
+    fi
+  done
+done
 
 %files
 /usr/share/sangfor

@@ -66,8 +66,8 @@ if [ "$DIST_GIVEN" = 0 ] && [ -n "${ATRUST_DIST:-}" ]; then
   DIST_GIVEN=1
 fi
 
-for cmd in rpmbuild ar xz; do
-  command -v "$cmd" >/dev/null 2>&1 || { echo "错误: 缺少命令 '$cmd'，请先安装: sudo dnf install -y rpm-build binutils xz" >&2; exit 1; }
+for cmd in rpmbuild ar xz patchelf; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "错误: 缺少命令 '$cmd'，请先安装: sudo dnf install -y rpm-build binutils xz patchelf" >&2; exit 1; }
 done
 
 # --- 检查仓库内的打包文件 ---------------------------------------------------
