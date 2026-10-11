@@ -132,6 +132,17 @@ https://atrustcdn.sangfor.com/standard/linux/2.5.16.30/ubuntu/amd64/aTrustInstal
     导致历史/地址数据库（libmmkv）加载失败，表现为“接入地址重启后为空”。
     构建时用 `patchelf --clear-execstack` 去掉该标记即可（mmkv 并不需要可执行栈）。
     涉及 `BuildRequires: patchelf`，CI 与本地构建都会自动安装。
+12. **库符号抢占导致崩溃（重要）**：客户端自带一些旧版库（`libsqlite3.so`=
+    SQLCipher、`libcurl.so`、`libcrypto.so.1.1`），Fedora 上进程同时会加载系统同名
+    库（`libtinysparql` 需要系统 `libsqlite3.so.0`；系统 `libcurl.so.4`/OpenSSL4），
+    产生符号抢占，导致 SEGV（`sqlcipher_activate -> NULL`、SSL 回调 ABI 不一致）。
+    处理方式（沿用官方对 aTrustCore 的 `LD_PRELOAD` 思路）：
+    - 托盘：`/usr/libexec/cn.com.sangfor.atrust/run-tray` 包装脚本 + `aTrustTrayStart.sh`
+      统一设置 `LD_PRELOAD=<内置 libsqlite3.so 内置 libcurl.so>`；
+    - 守护进程：`aTrustDaemon.service` 的 `Environment=LD_PRELOAD=<内置 libcurl.so>`；
+    - 所有 Qt 组件（aTrustTray2、uem_dialog 等）需要
+      `QT_QPA_PLATFORM_PLUGIN_PATH=/usr/share/sangfor/aTrust/resources/lib`，
+      否则会因找不到内置平台插件而 Abort；该变量在包装脚本、托盘脚本、守护进程内均设置。
 
 ## 已验证
 
@@ -143,6 +154,8 @@ https://atrustcdn.sangfor.com/standard/linux/2.5.16.30/ubuntu/amd64/aTrustInstal
 - Electron 托盘在虚拟显示（Xvfb）下可正常启动运行，界面中英文/数字均能正常显示（无方框）。
 - `libmmkv.so` 可被 dlopen 加载；`visitHistory -q` 能返回已保存的接入地址
   （如 `https://vpn.966599.com`），接入地址可持久化。
+- 守护进程 `aTrustDaemon` 不再 SEGV 崩溃重启（MainPID 稳定、NRestarts=0）。
+- Electron 托盘不再 SEGV；Qt 工作台 `aTrustTray2` 不再 Abort；托盘可正常连上服务器。
 
 ## 已知限制
 

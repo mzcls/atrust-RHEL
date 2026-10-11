@@ -128,6 +128,7 @@ install -m 0755 helpers/cn.com.sangfor.atrust.common   %{buildroot}%{_libexecdir
 install -m 0755 helpers/cn.com.sangfor.atrust.create_dir %{buildroot}%{_libexecdir}/cn.com.sangfor.atrust/
 install -m 0755 helpers/cn.com.sangfor.atrust.postinst %{buildroot}%{_libexecdir}/cn.com.sangfor.atrust/
 install -m 0755 helpers/cn.com.sangfor.atrust.prerm    %{buildroot}%{_libexecdir}/cn.com.sangfor.atrust/
+install -m 0755 helpers/run-tray                       %{buildroot}%{_libexecdir}/cn.com.sangfor.atrust/run-tray
 
 # /usr/share/applications entry: keep the upstream regular desktop file during
 # build; the post-install script turns it into a symlink to the app entry (same
@@ -170,12 +171,27 @@ cat > %{buildroot}/etc/fonts/atrust-fonts.conf <<'FONTCONF'
 </fontconfig>
 FONTCONF
 
-# 让 aTrust 的所有 GUI 进程使用上述 fontconfig
-sed -i 's#^Exec=/usr/share/sangfor/aTrust/aTrustTray#Exec=env FONTCONFIG_FILE=/etc/fonts/atrust-fonts.conf /usr/share/sangfor/aTrust/aTrustTray#' \
+# 让 aTrust 的所有 GUI 进程使用上述 fontconfig，并统一修复 Fedora 下的
+# 库符号抢占问题（详见 helpers/run-tray）：
+#   - LD_PRELOAD 内置 libsqlite3.so / libcurl.so，避免系统同名库抢占
+#   - QT_QPA_PLATFORM_PLUGIN_PATH 指向内置 Qt 平台插件目录
+# 桌面项改为调用包装脚本；托盘启动脚本与守护进程内联设置同样的环境变量。
+sed -i 's#^Exec=/usr/share/sangfor/aTrust/aTrustTray#Exec=%{_libexecdir}/cn.com.sangfor.atrust/run-tray#' \
     %{buildroot}/opt/apps/cn.com.sangfor.atrust/entries/applications/cn.com.sangfor.atrust.desktop \
     %{buildroot}/usr/share/applications/cn.com.sangfor.atrust.desktop
-sed -i '/^export PATH$/a export FONTCONFIG_FILE=/etc/fonts/atrust-fonts.conf' \
+sed -i \
+  -e '/^export PATH$/a export LD_PRELOAD="/usr/share/sangfor/aTrust/resources/bin/libsqlite3.so /usr/share/sangfor/aTrust/resources/bin/libcurl.so"' \
+  -e '/^export PATH$/a export QT_QPA_PLATFORM_PLUGIN_PATH=/usr/share/sangfor/aTrust/resources/lib' \
+  -e '/^export PATH$/a export FONTCONFIG_FILE=/etc/fonts/atrust-fonts.conf' \
     %{buildroot}/usr/share/sangfor/aTrust/resources/shell/aTrustTrayStart.sh
+
+# 守护进程同样需要：让内置 libcurl 优先，避免系统 libcurl.so.4(OpenSSL4) 与
+# 内置 OpenSSL1.1 的 SSL 回调 ABI 不一致导致守护进程 SEGV；同时给其拉起的
+# Qt 工具提供平台插件路径与字体配置。
+sed -i '/^\[Service\]/a Environment=LD_PRELOAD=/usr/share/sangfor/aTrust/resources/bin/libcurl.so\nEnvironment=QT_QPA_PLATFORM_PLUGIN_PATH=/usr/share/sangfor/aTrust/resources/lib\nEnvironment=FONTCONFIG_FILE=/etc/fonts/atrust-fonts.conf' \
+    %{buildroot}/usr/lib/systemd/system/aTrustDaemon.service
+sed -i '/^APPHOME=/a export LD_PRELOAD=/usr/share/sangfor/aTrust/resources/bin/libcurl.so' \
+    %{buildroot}/usr/share/sangfor/aTrust/resources/shell/aTrustDaemon.sh
 
 # 清理“可执行栈(execstack)”需求。
 # 客户端自带的 libmmkv.so 带有 PT_GNU_STACK=RWE 标记，新版内核/glibc 会拒绝加载
