@@ -156,7 +156,7 @@ https://atrustcdn.sangfor.com/standard/linux/2.5.16.30/ubuntu/amd64/aTrustInstal
 - 包内所有 ELF 依赖均可解析（`ldd` 无 missing）。
 - Electron 托盘在虚拟显示（Xvfb）下可正常启动运行，界面中英文/数字均能正常显示（无方框）。
 - `libmmkv.so` 可被 dlopen 加载；`visitHistory -q` 能返回已保存的接入地址
-  （如 `https://vpn.966599.com`），接入地址可持久化。
+  （如 `https://vpn.xxx.com`），接入地址可持久化。
 - 守护进程 `aTrustDaemon` 不再 SEGV 崩溃重启（MainPID 稳定、NRestarts=0）。
 - Electron 托盘不再 SEGV；Qt 工作台 `aTrustTray2` 不再 Abort；托盘可正常连上服务器。
 
