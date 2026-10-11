@@ -214,6 +214,27 @@ for d in \
   done
 done
 
+# 让关键程序“直接依赖”内置的 libcurl/libsqlite3，避免被系统同名库符号抢占：
+#   - 系统 GTK3 会带出 libtinysparql -> 系统 libsqlite3.so.0，与内置 SQLCipher
+#     抢占符号导致 sqlcipher_activate 崩溃；
+#   - 系统 libcurl.so.4(OpenSSL4) 与内置 OpenSSL1.1 的 SSL 回调 ABI 不一致。
+# 通过给主程序加 DT_NEEDED（排在最前）让内置库优先加载，从而不依赖启动脚本的
+# 环境变量（桌面/菜单/守护进程任何方式启动都生效）。
+add_needed() {
+  local f="$1"; shift
+  [ -f "$f" ] || return 0
+  local lib
+  for lib in "$@"; do
+    if ! LC_ALL=C readelf -d "$f" | grep -q "NEEDED.*\[$lib\]"; then
+      patchelf --add-needed "$lib" "$f"
+      echo "add-needed $lib -> ${f#%{buildroot}}"
+    fi
+  done
+}
+add_needed %{buildroot}/usr/share/sangfor/aTrust/aTrustTray                libcurl.so libsqlite3.so
+add_needed %{buildroot}/usr/share/sangfor/aTrust/resources/bin/aTrustTray2 libcurl.so libsqlite3.so
+add_needed %{buildroot}/usr/share/sangfor/aTrust/resources/bin/aTrustAgent libcurl.so libsqlite3.so
+
 %files
 /usr/share/sangfor
 /opt/apps

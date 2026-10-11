@@ -143,6 +143,9 @@ https://atrustcdn.sangfor.com/standard/linux/2.5.16.30/ubuntu/amd64/aTrustInstal
     - 所有 Qt 组件（aTrustTray2、uem_dialog 等）需要
       `QT_QPA_PLATFORM_PLUGIN_PATH=/usr/share/sangfor/aTrust/resources/lib`，
       否则会因找不到内置平台插件而 Abort；该变量在包装脚本、托盘脚本、守护进程内均设置。
+    另外，为了让修复**不依赖启动方式**（桌面图标、菜单、守护进程等任何入口），
+    构建时还给 `aTrustTray`/`aTrustTray2`/`aTrustAgent` 直接加入
+    `DT_NEEDED`（`libcurl.so`、`libsqlite3.so`），使内置库在加载顺序上必然优先。
 
 ## 已验证
 
